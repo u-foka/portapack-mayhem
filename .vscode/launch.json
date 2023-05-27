@@ -1,0 +1,22 @@
+{
+   // Use IntelliSense to learn about possible attributes.
+   // Hover to view descriptions of existing attributes.
+   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+   "version": "0.2.0",
+   "configurations": [
+      {
+         "name": "Attach FW (DAP)",
+         "cwd": "${workspaceFolder}",
+         //"executable": "${workspaceFolder}/build/hackrf-portapack/hackrf_usb.elf",
+         "executable": "${workspaceFolder}/build/firmware/baseband/baseband_sd_over_usb.elf",
+         "request": "attach",
+         "type": "cortex-debug",
+         "servertype": "openocd",
+         "device": "cmsis-dap",
+         "configFiles": [
+             "interface/cmsis-dap.cfg",
+             "${workspaceFolder}/debug/lpc4350_dap.cfg",
+         ],
+     },
+   ]
+}
