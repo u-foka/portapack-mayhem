@@ -114,7 +114,7 @@ void PlaylistView::on_file_changed(std::filesystem::path new_file_path, rf::Freq
     progressbar.set_max(file_size);
     text_filename.set(file_path.filename().string().substr(0, 12));
     text_duration.set(to_string_time_ms(duration));
-    // text_track.set(std::to_string(track_number) + "/" + std::to_string(total_tracks));
+    text_track.set(to_string_dec_uint(track_number) + "/" + to_string_dec_uint(total_tracks));
 
     button_play.focus();
 }

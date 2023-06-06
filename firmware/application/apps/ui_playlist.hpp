@@ -130,10 +130,9 @@ class PlaylistView : public View {
         &bitmap_play,
         Color::green(),
         Color::black()};
-    // TODO: add track number
-    // Text text_track{
-    //     {18 * 8, 1 * 16, 12 * 8, 16},
-    //     "0/0"};
+        Text text_track{
+            {18 * 8, 1 * 16, 12 * 8, 16},
+            "0/0"};
 
     spectrum::WaterfallWidget waterfall{};
 
