@@ -24,18 +24,63 @@
 #include <cstdint>
 
 #include <ch.h>
+#include <hal.h>
+
+static void to_string_hex_internal(char* p, const uint64_t n, const int32_t l) {
+    const uint32_t d = n & 0xf;
+    p[l] = (d > 9) ? (d + 55) : (d + 48);
+    if (l > 0) {
+        to_string_hex_internal(p, n >> 4, l - 1);
+    }
+}
 
 void* operator new(size_t size) {
     void* p = chHeapAlloc(0x0, size);
+    
     if (p == nullptr)
-        chDbgPanic("Out of Memory");
+    {
+        regarm_t lr;
+        asm volatile ("mov     %0, lr" : "=r" (lr) : : "memory");
+
+        struct extctx* ctxp;
+        if ((uint32_t)lr & 0x04)
+            ctxp = (struct extctx*)__get_PSP();
+        else
+            ctxp = (struct extctx*)__get_MSP();
+
+        char msg[16] = "OOM: 0x";
+        char *p = msg + 7;
+        to_string_hex_internal(p, (uint32_t)ctxp->pc, 8 - 1);
+        msg[16] = 0;
+
+        chDbgPanic(msg);
+    }
+
     return p;
 }
 
 void* operator new[](size_t size) {
     void* p = chHeapAlloc(0x0, size);
+    
     if (p == nullptr)
-        chDbgPanic("Out of Memory");
+    {
+        regarm_t lr;
+        asm volatile ("mov     %0, lr" : "=r" (lr) : : "memory");
+
+        struct extctx* ctxp;
+        if ((uint32_t)lr & 0x04)
+            ctxp = (struct extctx*)__get_PSP();
+        else
+            ctxp = (struct extctx*)__get_MSP();
+
+        char msg[16] = "OOM: 0x";
+        char *p = msg + 7;
+        to_string_hex_internal(p, (uint32_t)ctxp->pc, 8 - 1);
+        msg[16] = 0;
+
+        chDbgPanic(msg);
+    }
+
     return p;
 }
 
