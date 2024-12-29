@@ -81,6 +81,7 @@ class BtnGridView : public View {
     bool on_encoder(const EncoderEvent event) override;
     bool blacklisted_app(GridItem new_item);
 
+    void reload_items();
     void update_items();
 
    protected:
@@ -109,6 +110,7 @@ class BtnGridView : public View {
     size_t displayed_max{0};
     size_t highlighted_item{0};
     size_t offset{0};
+    SignalToken sd_card_status_signal_token{};
 };
 
 } /* namespace ui */

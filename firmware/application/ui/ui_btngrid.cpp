@@ -26,6 +26,7 @@
 
 #include "ui_btngrid.hpp"
 #include "rtc_time.hpp"
+#include "sd_card.hpp"
 
 namespace ui {
 
@@ -153,6 +154,11 @@ void BtnGridView::insert_item(const GridItem& new_item, size_t position, bool in
     }
 }
 
+void BtnGridView::reload_items() {
+    clear();
+    on_populate();
+}
+
 void BtnGridView::update_items() {
     size_t i = 0;
     Color bg_color = portapack::persistent_memory::menu_color();
@@ -241,6 +247,10 @@ void BtnGridView::on_blur() {
 }
 
 void BtnGridView::on_show() {
+    sd_card_status_signal_token = sd_card::status_signal += [this](const sd_card::Status status) {
+        this->reload_items();
+    };
+
     on_populate();
 
     View::on_show();
