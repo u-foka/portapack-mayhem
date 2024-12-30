@@ -156,6 +156,7 @@ void BtnGridView::insert_item(const GridItem& new_item, size_t position, bool in
 
 void BtnGridView::reload_items() {
     clear();
+    update_items();
     on_populate();
 }
 
@@ -257,6 +258,8 @@ void BtnGridView::on_show() {
 }
 
 void BtnGridView::on_hide() {
+    sd_card::status_signal -= sd_card_status_signal_token;
+
     View::on_hide();
 
     clear();
