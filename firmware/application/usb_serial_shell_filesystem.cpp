@@ -375,9 +375,16 @@ void cmd_sd_write_binary(BaseSequentialStream* chp, int argc, char* argv[]) {
 
     do {
         size_t bytes_to_read = size > USB_BULK_BUFFER_SIZE ? USB_BULK_BUFFER_SIZE : size;
-        size_t bytes_read = chSequentialStreamRead(chp, &buffer[0], bytes_to_read);
-        if (bytes_read != bytes_to_read)
+        // Use a 5-second timeout to prevent the shell thread from hanging forever
+        // if the USB connection is dropped. If timeout occurs, bytes_read will be
+        // less than bytes_to_read, allowing us to close the file and exit gracefully.
+        size_t bytes_read = chIQReadTimeout(&SUSBD1.iqueue, &buffer[0], bytes_to_read, MS2ST(5000));
+        if (bytes_read != bytes_to_read) {
+            if (bytes_read == 0) {
+                chprintf(chp, "timeout or connection closed\r\n");
+            }
             return;
+        }
 
         auto error = shell_file->write(&buffer[0], bytes_read);
         if (report_on_error(chp, error)) return;

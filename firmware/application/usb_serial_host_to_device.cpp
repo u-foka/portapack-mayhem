@@ -37,8 +37,8 @@ usb_serial_input_handler_t usb_serial_active_input_handler = nullptr;
 
 struct usb_bulk_buffer_t {
     uint8_t* data;
-    size_t length;
-    bool completed;
+    volatile size_t length;
+    volatile bool completed;
 };
 
 std::queue<usb_bulk_buffer_t*> usb_bulk_buffer_queue;
