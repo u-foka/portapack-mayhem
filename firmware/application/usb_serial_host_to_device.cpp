@@ -37,8 +37,8 @@ usb_serial_input_handler_t usb_serial_active_input_handler = nullptr;
 
 struct usb_bulk_buffer_t {
     uint8_t* data;
-    volatile size_t length;
-    volatile bool completed;
+    size_t length;
+    bool completed;
 };
 
 std::queue<usb_bulk_buffer_t*> usb_bulk_buffer_queue;
@@ -56,34 +56,20 @@ void init_host_to_device() {
 }
 
 void reset_transfer_queues() {
-    chSysLock();
-    while (!usb_bulk_buffer_queue.empty()) {
-        usb_bulk_buffer_t* p = usb_bulk_buffer_queue.front();
+    while (usb_bulk_buffer_queue.empty() == false)
         usb_bulk_buffer_queue.pop();
-        chSysUnlock();
-        delete[] p->data;
-        delete p;
-        chSysLock();
-    }
 
-    while (!usb_bulk_buffer_spare.empty()) {
-        usb_bulk_buffer_t* p = usb_bulk_buffer_spare.front();
+    while (usb_bulk_buffer_spare.empty() == false)
         usb_bulk_buffer_spare.pop();
-        chSysUnlock();
-        delete[] p->data;
-        delete p;
-        chSysLock();
-    }
-    chSysUnlock();
 }
 
 void schedule_host_to_device_transfer() {
-    chSysLock();
-    if (usb_bulk_buffer_queue.size() >= 8) {
-        chSysUnlock();
+    // If queue is getting full, yield to let completion loop drain packets.
+    // This creates natural backpressure without requiring large buffers.
+    if (usb_bulk_buffer_queue.size() >= 6) {
+        chThdSleepMilliseconds(1);  // yield so event loop can run
         return;
     }
-    chSysUnlock();
 
     static usb_bulk_buffer_t* transfer_data = nullptr;
 
@@ -91,15 +77,12 @@ void schedule_host_to_device_transfer() {
 
     do {
         if (transfer_data == nullptr) {
-            chSysLock();
-            if (!usb_bulk_buffer_spare.empty()) {
+            if (usb_bulk_buffer_spare.empty() == false) {
                 transfer_data = usb_bulk_buffer_spare.front();
                 transfer_data->length = 0;
                 transfer_data->completed = false;
                 usb_bulk_buffer_spare.pop();
-                chSysUnlock();
             } else {
-                chSysUnlock();
                 transfer_data = new usb_bulk_buffer_t{
                     .data = new uint8_t[USB_BULK_BUFFER_SIZE],
                     .length = 0,
@@ -115,28 +98,18 @@ void schedule_host_to_device_transfer() {
             transfer_data);
 
         if (ret != -1) {
-            chSysLock();
             usb_bulk_buffer_queue.push(transfer_data);
             transfer_data = nullptr;
 
-            const bool queue_full = usb_bulk_buffer_queue.size() >= 8;
-            chSysUnlock();
-            if (queue_full)
+            if (usb_bulk_buffer_queue.size() >= 8)
                 return;
         }
     } while (ret != -1);
 }
 
 void complete_host_to_device_transfer() {
-    while (true) {
-        chSysLock();
-        if (usb_bulk_buffer_queue.empty()) {
-            chSysUnlock();
-            break;
-        }
-        
+    for (; !usb_bulk_buffer_queue.empty(); usb_bulk_buffer_queue.pop()) {
         usb_bulk_buffer_t* transfer_data = usb_bulk_buffer_queue.front();
-        chSysUnlock();
 
         while (transfer_data->completed == false)
             return;
@@ -148,30 +121,21 @@ void complete_host_to_device_transfer() {
             usb_serial_active_input_handler(transfer_data->data, transfer_data->length);
         } else {
             // Normal operation: feed bytes into the shell iqueue
-            // Check if iqueue has enough free space for the entire buffer to avoid
-            // blocking the event loop when shell thread is busy with SD card I/O.
+            // If there is not enough room for this full USB packet, yield and retry
+            // on the next dispatch cycle so the event loop stays responsive.
             int iqueue_free = USBSERIAL_BUFFERS_SIZE - chIQGetFullI(&SUSBD1.iqueue);
-            
             if (iqueue_free < (int)transfer_data->length) {
-                // Not enough space; return early and retry on next event loop iteration.
-                // This prevents the event loop from blocking and allows USB responsiveness
-                // even when the shell thread is stalled on slow SD card operations.
                 chSysUnlock();
                 return;
             }
-            
-            // Safe to add all bytes since we verified space availability
+
             for (unsigned int i = 0; i < transfer_data->length; i++) {
                 msg_t ret = chIQPutI(&SUSBD1.iqueue, transfer_data->data[i]);
-                // Space was pre-verified, so this should not fail; ignore ret
                 (void)ret;
             }
             chSysUnlock();
         }
 
-        chSysLock();
-        usb_bulk_buffer_queue.pop();
         usb_bulk_buffer_spare.push(transfer_data);
-        chSysUnlock();
     }
 }

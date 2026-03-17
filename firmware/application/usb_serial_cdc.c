@@ -51,9 +51,7 @@ CH_IRQ_HANDLER(USB0_IRQHandler) {
     }
 
     if (status & USB0_USBSTS_D_SLI) {
-        chSysLockFromIsr();
         on_channel_closed();
-        chSysUnlockFromIsr();
     }
 
     CH_IRQ_EPILOGUE();

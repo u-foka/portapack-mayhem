@@ -29,6 +29,11 @@ void USBSerial::initialize() {
 }
 
 void USBSerial::dispatch() {
+    if (channel_close_pending) {
+        reset_transfer_queues();
+        channel_close_pending = false;
+    }
+
     if (!connected)
         return;
 
@@ -41,6 +46,11 @@ void USBSerial::dispatch() {
 }
 
 void USBSerial::dispatch_transfer() {
+    if (channel_close_pending) {
+        reset_transfer_queues();
+        channel_close_pending = false;
+    }
+
     complete_host_to_device_transfer();
 }
 
@@ -49,7 +59,7 @@ void USBSerial::on_channel_opened() {
 }
 
 void USBSerial::on_channel_closed() {
-    reset_transfer_queues();
+    channel_close_pending = true;
     connected = false;
 }
 

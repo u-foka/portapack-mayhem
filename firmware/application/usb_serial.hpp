@@ -48,7 +48,8 @@ class USBSerial {
 
     void setup_usb_clock();
 
-    bool connected{false};
+    volatile bool connected{false};
+    volatile bool channel_close_pending{false};
     bool shell_created{false};
 
     EventDispatcher* _eventDispatcher = NULL;
