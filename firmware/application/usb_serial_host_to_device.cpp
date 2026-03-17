@@ -64,12 +64,8 @@ void reset_transfer_queues() {
 }
 
 void schedule_host_to_device_transfer() {
-    // If queue is getting full, yield to let completion loop drain packets.
-    // This creates natural backpressure without requiring large buffers.
-    if (usb_bulk_buffer_queue.size() >= 6) {
-        chThdSleepMilliseconds(1);  // yield so event loop can run
+    if (usb_bulk_buffer_queue.size() >= 8)
         return;
-    }
 
     static usb_bulk_buffer_t* transfer_data = nullptr;
 

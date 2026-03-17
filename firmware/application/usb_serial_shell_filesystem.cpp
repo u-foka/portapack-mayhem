@@ -369,7 +369,7 @@ void cmd_sd_write_binary(BaseSequentialStream* chp, int argc, char* argv[]) {
 
     size_t size = (size_t)strtol(argv[0], NULL, 10);
 
-    chprintf(chp, "send %u bytes\r\n", (unsigned)size);
+    chprintf(chp, "send %d bytes\r\n", size);
 
     uint8_t buffer[USB_BULK_BUFFER_SIZE];
 
