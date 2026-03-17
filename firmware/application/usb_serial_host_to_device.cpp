@@ -56,16 +56,34 @@ void init_host_to_device() {
 }
 
 void reset_transfer_queues() {
-    while (usb_bulk_buffer_queue.empty() == false)
+    chSysLock();
+    while (!usb_bulk_buffer_queue.empty()) {
+        usb_bulk_buffer_t* p = usb_bulk_buffer_queue.front();
         usb_bulk_buffer_queue.pop();
+        chSysUnlock();
+        delete[] p->data;
+        delete p;
+        chSysLock();
+    }
 
-    while (usb_bulk_buffer_spare.empty() == false)
+    while (!usb_bulk_buffer_spare.empty()) {
+        usb_bulk_buffer_t* p = usb_bulk_buffer_spare.front();
         usb_bulk_buffer_spare.pop();
+        chSysUnlock();
+        delete[] p->data;
+        delete p;
+        chSysLock();
+    }
+    chSysUnlock();
 }
 
 void schedule_host_to_device_transfer() {
-    if (usb_bulk_buffer_queue.size() >= 8)
+    chSysLock();
+    if (usb_bulk_buffer_queue.size() >= 8) {
+        chSysUnlock();
         return;
+    }
+    chSysUnlock();
 
     static usb_bulk_buffer_t* transfer_data = nullptr;
 
@@ -73,12 +91,15 @@ void schedule_host_to_device_transfer() {
 
     do {
         if (transfer_data == nullptr) {
-            if (usb_bulk_buffer_spare.empty() == false) {
+            chSysLock();
+            if (!usb_bulk_buffer_spare.empty()) {
                 transfer_data = usb_bulk_buffer_spare.front();
                 transfer_data->length = 0;
                 transfer_data->completed = false;
                 usb_bulk_buffer_spare.pop();
+                chSysUnlock();
             } else {
+                chSysUnlock();
                 transfer_data = new usb_bulk_buffer_t{
                     .data = new uint8_t[USB_BULK_BUFFER_SIZE],
                     .length = 0,
@@ -94,18 +115,28 @@ void schedule_host_to_device_transfer() {
             transfer_data);
 
         if (ret != -1) {
+            chSysLock();
             usb_bulk_buffer_queue.push(transfer_data);
             transfer_data = nullptr;
 
-            if (usb_bulk_buffer_queue.size() >= 8)
+            const bool queue_full = usb_bulk_buffer_queue.size() >= 8;
+            chSysUnlock();
+            if (queue_full)
                 return;
         }
     } while (ret != -1);
 }
 
 void complete_host_to_device_transfer() {
-    for (; !usb_bulk_buffer_queue.empty(); usb_bulk_buffer_queue.pop()) {
+    while (true) {
+        chSysLock();
+        if (usb_bulk_buffer_queue.empty()) {
+            chSysUnlock();
+            break;
+        }
+        
         usb_bulk_buffer_t* transfer_data = usb_bulk_buffer_queue.front();
+        chSysUnlock();
 
         while (transfer_data->completed == false)
             return;
@@ -133,6 +164,9 @@ void complete_host_to_device_transfer() {
             chSysUnlock();
         }
 
+        chSysLock();
+        usb_bulk_buffer_queue.pop();
         usb_bulk_buffer_spare.push(transfer_data);
+        chSysUnlock();
     }
 }
