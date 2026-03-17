@@ -148,18 +148,23 @@ void complete_host_to_device_transfer() {
             usb_serial_active_input_handler(transfer_data->data, transfer_data->length);
         } else {
             // Normal operation: feed bytes into the shell iqueue
+            // Check if iqueue has enough free space for the entire buffer to avoid
+            // blocking the event loop when shell thread is busy with SD card I/O.
+            int iqueue_free = USBSERIAL_BUFFERS_SIZE - chIQGetFullI(&SUSBD1.iqueue);
+            
+            if (iqueue_free < (int)transfer_data->length) {
+                // Not enough space; return early and retry on next event loop iteration.
+                // This prevents the event loop from blocking and allows USB responsiveness
+                // even when the shell thread is stalled on slow SD card operations.
+                chSysUnlock();
+                return;
+            }
+            
+            // Safe to add all bytes since we verified space availability
             for (unsigned int i = 0; i < transfer_data->length; i++) {
-                msg_t ret;
-                do {
-                    ret = chIQPutI(&SUSBD1.iqueue, transfer_data->data[i]);
-
-                    if (ret == Q_FULL) {
-                        chSysUnlock();
-                        chThdSleepMilliseconds(1);  // wait for shell thread when buffer is full
-                        chSysLock();
-                    }
-
-                } while (ret == Q_FULL);
+                msg_t ret = chIQPutI(&SUSBD1.iqueue, transfer_data->data[i]);
+                // Space was pre-verified, so this should not fail; ignore ret
+                (void)ret;
             }
             chSysUnlock();
         }
